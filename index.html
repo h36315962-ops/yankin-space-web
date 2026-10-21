@@ -1122,6 +1122,15 @@ window.SITE_DATA = {
    * ============================================================ */
   (function () {
     var STORE_KEY = 'yunlin_site_data_v2';
+
+    /* ============ 云端同步配置（网站数据读写 GitHub 仓库） ============ */
+    var CLOUD = {
+      owner: 'h36315962-ops',
+      repo: 'yankin-space-web',
+      branch: 'main',
+      /* 编辑密码 January22nd 的 SHA-256，用于网页端编辑/发布鉴权 */
+      passHash: '420d02197c9c2c2ffd21fcb928e0d7382fe29115c5a682b2b542db8d368f91f9'
+    };
     var data = null;
 
     /* ---------- 工具函数 ---------- */
@@ -1161,15 +1170,116 @@ window.SITE_DATA = {
       return '';
     }
 
-    /* ---------- 数据加载 ---------- */
+    /* ---------- 数据加载：优先云端 data.json，其次本机缓存，最后内置数据 ---------- */
     function loadData() {
-      try {
-        var raw = localStorage.getItem(STORE_KEY);
-        if (raw) { data = JSON.parse(raw); return; }
-      } catch (e) { /* 忽略损坏数据 */ }
-      data = deepClone(window.SITE_DATA);
+      return new Promise(function (resolve) {
+        function localFallback() {
+          try {
+            var raw = localStorage.getItem(STORE_KEY);
+            if (raw) { data = JSON.parse(raw); return; }
+          } catch (e) { /* 忽略损坏数据 */ }
+          data = deepClone(window.SITE_DATA);
+        }
+        try {
+          var url = 'https://raw.githubusercontent.com/' + CLOUD.owner + '/' + CLOUD.repo + '/' + CLOUD.branch + '/data.json?t=' + Date.now();
+          fetch(url, { cache: 'no-store' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(function (remote) {
+              if (remote && remote.meta) { data = remote; persistLocal(); toast('已同步云端最新内容'); resolve(); }
+              else { localFallback(); resolve(); }
+            })
+            .catch(function () { localFallback(); resolve(); });
+        } catch (e) { localFallback(); resolve(); }
+      });
     }
     function persistLocal() { localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
+
+    /* ---------- 编辑密码 + 一键发布到云端 ---------- */
+    var TOKEN_KEY = 'yunlin_site_token_v1';
+    var token = localStorage.getItem(TOKEN_KEY) || '';
+    var unlocked = false;
+    function sha256hex(str) {
+      if (!(window.crypto && crypto.subtle)) return Promise.resolve('');
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+          return ('0' + b.toString(16)).slice(-2);
+        }).join('');
+      });
+    }
+    function openModal(html) {
+      var card = document.querySelector('#publish-guide .pg-card');
+      card.innerHTML = html;
+      document.getElementById('publish-guide').classList.add('show');
+      var inp = card.querySelector('input');
+      if (inp) inp.focus();
+    }
+    function closeModal() { document.getElementById('publish-guide').classList.remove('show'); }
+    /* 需要密码（+发布令牌）才能进入编辑 / 发布；每台设备验证一次，凭据保存在本机浏览器 */
+    function requirePassword(done) {
+      if (unlocked && token) { done(); return; }
+      var needToken = !token;
+      openModal(
+        '<h3>输入编辑密码' + (needToken ? '与发布令牌' : '') + '</h3>' +
+        '<input type="password" id="pwd-input" placeholder="编辑密码" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;margin:12px 0 4px;border:1px solid #ccc;border-radius:8px;">' +
+        (needToken
+          ? '<p style="font-size:12px;color:#888;margin:2px 0 8px;">首次使用需粘贴发布令牌（GitHub 生成的 Token，仅保存在本机浏览器）</p>' +
+            '<input type="password" id="tok-input" placeholder="发布令牌（ghp_ 开头）" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;margin:0 0 8px;border:1px solid #ccc;border-radius:8px;">'
+          : '') +
+        '<p id="pwd-err" style="color:#d33;min-height:1.2em;font-size:13px;margin:0 0 10px;"></p>' +
+        '<button class="primary" id="pwd-ok" style="margin-right:8px">确认</button>' +
+        '<button id="pwd-cancel">取消</button>'
+      );
+      function check() {
+        var pv = document.getElementById('pwd-input').value;
+        sha256hex(pv).then(function (h) {
+          if (!h || h !== CLOUD.passHash) {
+            document.getElementById('pwd-err').textContent = '密码错误，请重试';
+            return;
+          }
+          if (needToken) {
+            var tv = (document.getElementById('tok-input').value || '').trim();
+            if (!tv) { document.getElementById('pwd-err').textContent = '请填写发布令牌'; return; }
+            token = tv;
+            try { localStorage.setItem(TOKEN_KEY, tv); } catch (e) {}
+          }
+          unlocked = true;
+          closeModal();
+          done();
+        });
+      }
+      document.getElementById('pwd-ok').addEventListener('click', check);
+      document.getElementById('pwd-cancel').addEventListener('click', closeModal);
+      var pi = document.getElementById('pwd-input');
+      pi.addEventListener('keydown', function (e) { if (e.key === 'Enter') check(); });
+      if (needToken) document.getElementById('tok-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') check(); });
+    }
+    /* 一键发布：把当前数据整体上传覆盖到 GitHub 的 data.json */
+    function publishToCloud() {
+      if (editing) { data = collectData(); setEditing(false); }
+      persistLocal();
+      var payload = JSON.stringify(data);
+      var b64 = btoa(unescape(encodeURIComponent(payload)));
+      var api = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/data.json';
+      var headers = { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' };
+      toast('正在发布，请稍候…');
+      fetch(api, { headers: headers })
+        .then(function (r) { return r.status === 200 ? r.json() : null; })
+        .then(function (meta) {
+          var body = { message: '网页端更新内容', content: b64, branch: CLOUD.branch };
+          if (meta && meta.sha) body.sha = meta.sha;
+          return fetch(api, { method: 'PUT', headers: headers, body: JSON.stringify(body) });
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res && res.content) {
+            openModal('<h3>发布成功</h3><p>内容已上传到网站。约 1–2 分钟后，任何设备刷新即可看到最新内容。</p><button class="primary" id="pg-ok">我知道了</button>');
+            document.getElementById('pg-ok').addEventListener('click', closeModal);
+          } else {
+            toast('发布失败：' + ((res && res.message) || '未知错误'));
+          }
+        })
+        .catch(function () { toast('发布失败：网络错误'); });
+    }
 
     /* ---------- 导航 ---------- */
     var TABS = [
@@ -1628,7 +1738,7 @@ window.SITE_DATA = {
     });
 
     document.getElementById('fab-edit').addEventListener('click', function () {
-      setEditing(!editing);
+      requirePassword(function () { setEditing(!editing); });
     });
 
     document.getElementById('btn-done').addEventListener('click', function () { setEditing(false); });
@@ -1673,15 +1783,9 @@ window.SITE_DATA = {
       toast('已导出 index.html（含你的全部修改与图片）');
     });
 
-    /* 发布到网站：生成最新 index.html 并弹出发布步骤指引 */
+    /* 发布到网站：输入密码后一键上传 data.json，全端同步 */
     document.getElementById('btn-publish').addEventListener('click', function () {
-      if (editing) { data = collectData(); setEditing(false); }
-      persistLocal();
-      exportSiteFile();
-      document.getElementById('publish-guide').classList.add('show');
-    });
-    document.getElementById('pg-close').addEventListener('click', function () {
-      document.getElementById('publish-guide').classList.remove('show');
+      requirePassword(publishToCloud);
     });
 
     /* 上传本地图片 */
@@ -1733,15 +1837,16 @@ window.SITE_DATA = {
     });
 
     /* ---------- 启动 ---------- */
-    loadData();
-    renderAll();
-    setEditing(false);
-    var initial = location.hash ? location.hash.slice(1) : 'home';
-    if (TABS.some(function (t) { return t.key === initial; })) {
-      showTab(initial, false);
-    } else {
-      showTab('home', false);
-    }
+    loadData().then(function () {
+      renderAll();
+      setEditing(false);
+      var initial = location.hash ? location.hash.slice(1) : 'home';
+      if (TABS.some(function (t) { return t.key === initial; })) {
+        showTab(initial, false);
+      } else {
+        showTab('home', false);
+      }
+    });
   })();
   </script>
 </body>
