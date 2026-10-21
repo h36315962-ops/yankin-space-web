@@ -1170,22 +1170,44 @@ window.SITE_DATA = {
       return '';
     }
 
+    /* 数据规范化：修复编辑保存时数组字段被覆盖成字符串的问题 */
+    function normalizeData() {
+      if (!data || typeof data !== 'object') return;
+      var pp = data.profile || {};
+      ['aliases', 'quickTags'].forEach(function (k) {
+        if (pp[k] != null && !Array.isArray(pp[k])) {
+          pp[k] = String(pp[k]).split(/[\/、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+        }
+      });
+      if (pp.hobbies && !Array.isArray(pp.hobbies.media)) pp.hobbies.media = [];
+      Object.keys(data.sections || {}).forEach(function (k) {
+        (data.sections[k].entries || []).forEach(function (en) {
+          if (en.tags != null && !Array.isArray(en.tags)) en.tags = String(en.tags).split(/[\/、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+          if (!en.tags || !Array.isArray(en.tags)) en.tags = [];
+          if (!en.media || !Array.isArray(en.media)) en.media = [];
+          if (en.text == null) en.text = '';
+          if (en.title == null) en.title = '未命名';
+          if (en.date == null) en.date = '';
+        });
+      });
+    }
     /* ---------- 数据加载：优先云端 data.json，其次本机缓存，最后内置数据 ---------- */
     function loadData() {
       return new Promise(function (resolve) {
         function localFallback() {
           try {
             var raw = localStorage.getItem(STORE_KEY);
-            if (raw) { data = JSON.parse(raw); return; }
+            if (raw) { data = JSON.parse(raw); normalizeData(); return; }
           } catch (e) { /* 忽略损坏数据 */ }
           data = deepClone(window.SITE_DATA);
+          normalizeData();
         }
         try {
           var url = 'https://raw.githubusercontent.com/' + CLOUD.owner + '/' + CLOUD.repo + '/' + CLOUD.branch + '/data.json?t=' + Date.now();
           fetch(url, { cache: 'no-store' })
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
             .then(function (remote) {
-              if (remote && remote.meta) { data = remote; persistLocal(); toast('已同步云端最新内容'); resolve(); }
+              if (remote && remote.meta) { data = remote; normalizeData(); persistLocal(); toast('已同步云端最新内容'); resolve(); }
               else { localFallback(); resolve(); }
             })
             .catch(function () { localFallback(); resolve(); });
@@ -1318,13 +1340,14 @@ window.SITE_DATA = {
     /* ---------- 渲染：首页 ---------- */
     function renderHome() {
       var p = data.profile;
-      var nick = (p.aliases && p.aliases[0]) ? '<span class="mag-nick" data-path="profile.aliases.0">（' + esc(p.aliases[0]) + '）</span>' : '';
+      var nickAliases = Array.isArray(p.aliases) ? p.aliases : String(p.aliases || '').split(/[\/、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var nick = nickAliases[0] ? '<span class="mag-nick" data-path="profile.aliases.0">（' + esc(nickAliases[0]) + '）</span>' : '';
       var quick = (p.quickTags || []).map(function (q, i) {
         return '<span class="qtag" data-path="profile.quickTags.' + i + '">' + esc(q) + '</span>';
       }).join(' ');
       var basicRows = [
         ['真实姓名', 'profile.realName', p.realName],
-        ['别名', 'profile.aliases', (p.aliases || []).join(' / ')],
+        ['别名', 'profile.aliases', nickAliases.join(' / ')],
         ['出生日期', 'profile.birthDate', p.birthDate],
         ['星座', 'profile.zodiac', p.zodiac],
         ['MBTI', 'profile.mbti', p.mbti]
@@ -1635,8 +1658,16 @@ window.SITE_DATA = {
         setPath(out, el.getAttribute('data-path'), v);
       });
       /* 规范化 */
+      var pp = out.profile || {};
+      ['aliases', 'quickTags'].forEach(function (k) {
+        if (pp[k] != null && !Array.isArray(pp[k])) {
+          pp[k] = String(pp[k]).split(/[\/、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+        }
+      });
+      if (pp.hobbies && !Array.isArray(pp.hobbies.media)) pp.hobbies.media = [];
       Object.keys(out.sections || {}).forEach(function (k) {
         (out.sections[k].entries || []).forEach(function (en) {
+          if (en.tags != null && !Array.isArray(en.tags)) en.tags = String(en.tags).split(/[\/、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
           if (!en.tags || !Array.isArray(en.tags)) en.tags = [];
           if (!en.media || !Array.isArray(en.media)) en.media = [];
           if (en.text == null) en.text = '';
