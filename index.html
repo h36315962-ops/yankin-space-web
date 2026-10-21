@@ -1741,7 +1741,10 @@ window.SITE_DATA = {
       requirePassword(function () { setEditing(!editing); });
     });
 
-    document.getElementById('btn-done').addEventListener('click', function () { setEditing(false); });
+    document.getElementById('btn-done').addEventListener('click', function () {
+      if (editing) { data = collectData(); persistLocal(); toast('已保存到本机，记得点「🚀 发布到网站」才会更新全站'); }
+      setEditing(false);
+    });
 
     document.getElementById('btn-save').addEventListener('click', function () {
       data = collectData();
