@@ -544,15 +544,15 @@
     font-weight: 600;
   }
   .entry-link a:hover { opacity: 0.9; }
-  .entry-embed { margin-top: 14px; }
+  .entry-embed { margin: 22px -26px -22px; background: #f5f7fa; overflow: hidden; border-radius: 0 0 14px 14px; }
   .doc-frame {
     width: 100%;
-    height: 80vh;
-    min-height: 500px;
-    border: 1px solid var(--rule);
-    border-radius: 12px;
-    background: #fff;
-    box-sizing: border-box;
+    height: 640px;
+    min-height: 360px;
+    border: 0;
+    border-radius: 0;
+    background: #f5f7fa;
+    display: block;
   }
 
   /* ============ Media ============ */
@@ -1149,7 +1149,7 @@ window.SITE_DATA = {
         {
           group: "工作产出作品",
           title: "企业供应链管理全流程 SOP 标准化指导书",
-          date: "2026-10",
+          date: "",
           text: "一份完整的供应链管理标准化作业指导书（SOP），系统梳理采购、仓储、物流、质量管理等环节的作业流程与规范要求，可为企业供应链团队提供统一的执行参考。",
           tags: ["供应链", "SOP", "标准化"],
           link: "https://h36315962-ops.github.io/yankin-space-web/supply-chain-sop-guide.html",
@@ -1653,7 +1653,7 @@ window.SITE_DATA = {
           lastGroup = en.group;
         }
         html += '<div class="entry">';
-        html += '<div class="entry-head"><span class="entry-title" data-path="' + prefix + '.title">' + esc(en.title) + '</span><span class="entry-date" data-path="' + prefix + '.date">' + esc(en.date) + '</span></div>';
+        html += '<div class="entry-head"><span class="entry-title" data-path="' + prefix + '.title">' + esc(en.title) + '</span>' + (en.date ? '<span class="entry-date" data-path="' + prefix + '.date">' + esc(en.date) + '</span>' : '') + '</div>';
         html += '<div class="entry-text" data-path="' + prefix + '.text">' + esc(en.text) + '</div>';
         html += '<div class="entry-tags">';
         (en.tags || []).forEach(function (tg, ti) {
