@@ -520,6 +520,30 @@
   .entry-text { font-size: 14.5px; color: var(--ink); white-space: pre-wrap; }
   .entry-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
   .empty-hint { text-align: center; color: var(--muted); font-size: 14px; padding: 30px 0; }
+  .entry-group {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin: 26px 2px 12px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .entry-group::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  .entry-group:first-child { margin-top: 6px; }
+  .entry-link { margin-top: 12px; }
+  .entry-link a {
+    display: inline-block;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .entry-link a:hover { opacity: 0.9; }
 
   /* ============ Media ============ */
   .entry-media { margin-top: 14px; }
@@ -1109,8 +1133,18 @@ window.SITE_DATA = {
     },
     works: {
       title: "作品",
-      desc: "持续更新的作品集——摄影、手作与更多尝试。",
-      entries: []
+      desc: "持续更新的作品集——工作作品、摄影、手作与更多尝试。",
+      entries: [
+        {
+          group: "工作作品",
+          title: "企业供应链管理全流程 SOP 标准化指导书",
+          date: "2026-10",
+          text: "一份完整的供应链管理标准化作业指导书（SOP），系统梳理采购、仓储、物流、质量管理等环节的作业流程与规范要求，可为企业供应链团队提供统一的执行参考。",
+          tags: ["供应链", "SOP", "标准化"],
+          link: "https://h36315962-ops.github.io/yankin-space-web/supply-chain-sop-guide.html",
+          media: []
+        }
+      ]
     }
   }
 };
@@ -1591,8 +1625,13 @@ window.SITE_DATA = {
       if (!entries.length) {
         html += '<div class="empty-hint">内容还在整理中，之后会陆续更新。</div>';
       }
+      var lastGroup = '';
       entries.forEach(function (en, i) {
         var prefix = 'sections.' + key + '.entries.' + i;
+        if (en.group && en.group !== lastGroup) {
+          html += '<div class="entry-group">' + esc(en.group) + '</div>';
+          lastGroup = en.group;
+        }
         html += '<div class="entry">';
         html += '<div class="entry-head"><span class="entry-title" data-path="' + prefix + '.title">' + esc(en.title) + '</span><span class="entry-date" data-path="' + prefix + '.date">' + esc(en.date) + '</span></div>';
         html += '<div class="entry-text" data-path="' + prefix + '.text">' + esc(en.text) + '</div>';
@@ -1601,6 +1640,9 @@ window.SITE_DATA = {
           html += '<span class="tag" data-path="' + prefix + '.tags.' + ti + '">' + esc(tg) + '</span>';
         });
         html += '</div>';
+        if (en.link) {
+          html += '<div class="entry-link"><a href="' + esc(en.link) + '" target="_blank" rel="noopener">查看完整文档 ↗</a></div>';
+        }
         if (key === 'life') {
           html += renderMagMedia(en.media, prefix, (LIFE_RATIOS[i] || []), en.fun ? 'pwall-fun' : '');
         } else {
