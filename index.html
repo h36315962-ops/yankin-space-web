@@ -621,7 +621,8 @@
   }
   body.edit-on .add-media-btn { display: inline-block; }
   .add-media-btn:hover { background: var(--accent); color: #fff; border-style: solid; }
-  .media-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .media-hint { display: none; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  body.edit-on .media-hint { display: block; }
 
   /* 杂志式照片墙（错列排布 + 图片配文） */
   .mag-photos { columns: 3; column-gap: 16px; margin-top: 16px; }
