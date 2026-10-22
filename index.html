@@ -1167,7 +1167,7 @@ window.SITE_DATA = {
    * 聂运林 · 个人空间 渲染与编辑逻辑
    * ============================================================ */
   (function () {
-    var STORE_KEY = 'yunlin_site_data_v2';
+    var STORE_KEY = 'yunlin_site_data_v3';
 
     /* ============ 云端同步配置（网站数据读写 GitHub 仓库） ============ */
     var CLOUD = {
@@ -1237,7 +1237,8 @@ window.SITE_DATA = {
         });
       });
     }
-    /* ---------- 数据加载：优先云端 data.json，其次本机缓存，最后内置数据 ---------- */
+    /* ---------- 数据加载：优先同源 github.io data.json（国内可稳定访问），
+     * 其次 raw.githubusercontent.com，再次本机缓存，最后内置数据 ---------- */
     function loadData() {
       return new Promise(function (resolve) {
         function localFallback() {
@@ -1248,16 +1249,21 @@ window.SITE_DATA = {
           data = deepClone(window.SITE_DATA);
           normalizeData();
         }
-        try {
-          var url = 'https://raw.githubusercontent.com/' + CLOUD.owner + '/' + CLOUD.repo + '/' + CLOUD.branch + '/data.json?t=' + Date.now();
-          fetch(url, { cache: 'no-store' })
+        var urls = [
+          'https://' + CLOUD.owner + '.github.io/' + CLOUD.repo + '/data.json',
+          'https://raw.githubusercontent.com/' + CLOUD.owner + '/' + CLOUD.repo + '/' + CLOUD.branch + '/data.json'
+        ];
+        function tryUrl(i) {
+          if (i >= urls.length) { localFallback(); resolve(); return; }
+          fetch(urls[i] + '?t=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
             .then(function (remote) {
               if (remote && remote.meta) { data = remote; normalizeData(); persistLocal(); toast('已同步云端最新内容'); resolve(); }
-              else { localFallback(); resolve(); }
+              else { tryUrl(i + 1); }
             })
-            .catch(function () { localFallback(); resolve(); });
-        } catch (e) { localFallback(); resolve(); }
+            .catch(function () { tryUrl(i + 1); });
+        }
+        try { tryUrl(0); } catch (e) { localFallback(); resolve(); }
       });
     }
     function persistLocal() { localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
