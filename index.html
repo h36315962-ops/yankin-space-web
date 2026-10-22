@@ -544,6 +544,16 @@
     font-weight: 600;
   }
   .entry-link a:hover { opacity: 0.9; }
+  .entry-embed { margin-top: 14px; }
+  .doc-frame {
+    width: 100%;
+    height: 80vh;
+    min-height: 500px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: #fff;
+    box-sizing: border-box;
+  }
 
   /* ============ Media ============ */
   .entry-media { margin-top: 14px; }
@@ -1136,12 +1146,13 @@ window.SITE_DATA = {
       desc: "持续更新的作品集——工作作品、摄影、手作与更多尝试。",
       entries: [
         {
-          group: "工作作品",
+          group: "工作产出作品",
           title: "企业供应链管理全流程 SOP 标准化指导书",
           date: "2026-10",
           text: "一份完整的供应链管理标准化作业指导书（SOP），系统梳理采购、仓储、物流、质量管理等环节的作业流程与规范要求，可为企业供应链团队提供统一的执行参考。",
           tags: ["供应链", "SOP", "标准化"],
           link: "https://h36315962-ops.github.io/yankin-space-web/supply-chain-sop-guide.html",
+          embed: true,
           media: []
         }
       ]
@@ -1370,6 +1381,8 @@ window.SITE_DATA = {
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    /* 内联 onclick 使用（首页「去看看」小方块） */
+    window.showTab = showTab;
 
     /* ---------- 渲染：首页 ---------- */
     function renderHome() {
@@ -1640,7 +1653,9 @@ window.SITE_DATA = {
           html += '<span class="tag" data-path="' + prefix + '.tags.' + ti + '">' + esc(tg) + '</span>';
         });
         html += '</div>';
-        if (en.link) {
+        if (en.link && en.embed) {
+          html += '<div class="entry-embed"><iframe class="doc-frame" src="' + esc(en.link) + '" loading="lazy"></iframe></div>';
+        } else if (en.link) {
           html += '<div class="entry-link"><a href="' + esc(en.link) + '" target="_blank" rel="noopener">查看完整文档 ↗</a></div>';
         }
         if (key === 'life') {
@@ -1655,6 +1670,16 @@ window.SITE_DATA = {
       html += '</div>';
       html += '<button class="add-entry-btn" data-add="' + key + '">＋ 新增内容</button>';
       page.innerHTML = html;
+      /* 内嵌文档 iframe 高度自适应（同源可读内容高度） */
+      page.querySelectorAll('iframe.doc-frame').forEach(function (f) {
+        f.addEventListener('load', function () {
+          try {
+            var doc = f.contentDocument || f.contentWindow.document;
+            var h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+            if (h > 100) f.style.height = (h + 40) + 'px';
+          } catch (e) { f.style.height = '80vh'; }
+        });
+      });
     }
 
     function renderAll() {
